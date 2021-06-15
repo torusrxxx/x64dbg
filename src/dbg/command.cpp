@@ -14,7 +14,7 @@
 
 COMMAND* cmd_list = 0;
 
-static bool vecContains(std::vector<String>* names, const char* name)
+static bool vecContains(const std::vector<String>* names, const char* name)
 {
     for(const auto & cmd : *names)
         if(!_stricmp(cmd.c_str(), name))

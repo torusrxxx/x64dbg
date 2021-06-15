@@ -690,20 +690,100 @@ bool cbDebugSetMemoryBpx(int argc, char* argv[])
     if(IsArgumentsLessThan(argc, 2))
         return false;
     duint addr;
+    duint size = 0;
     if(!valfromstring(argv[1], &addr))
         return false;
     bool restore = false;
-    char arg3[deflen] = "";
-    if(argc > 3)
-        strcpy_s(arg3, argv[3]);
+    char arg3[2] = "";
     if(argc > 2)
     {
-        if(*argv[2] == '1')
-            restore = true;
-        else if(*argv[2] == '0')
+        if(strcmp(argv[2], "1") == 0)
+        {
+            //bpm eax,1,a
+            if(argc > 3 && (*argv[3] == 'a' || *argv[3] == 'r' || *argv[3] == 'w' || *argv[3] == 'x'))
+            {
+                restore = true;
+                strncpy_s(arg3, argv[3], _TRUNCATE);
+            }
+            //bpm eax,1,1
+            else
+            {
+                if(argc > 3)
+                {
+                    if(argc > 4)
+                        strncpy_s(arg3, argv[4], _TRUNCATE);
+                    size = 1;
+                    //bpm eax,1,1
+                    if(*argv[3] == '1')
+                        restore = true;
+                    //bpm eax,1,0
+                    else if(*argv[3] == '0')
+                        restore = false;
+                    //bpm eax,1,? (bad)
+                    else
+                        dputs(QT_TRANSLATE_NOOP("DBG", "Invalid type (argument ignored)"));
+                }
+                //bpm eax,1
+                else
+                {
+                    restore = true;
+                }
+            }
+        }
+        else if(strcmp(argv[2], "0") == 0)
+        {
             restore = false;
+            if(argc > 3)
+            {
+                //bpm eax,0,a
+                if(*argv[3] == 'a' || *argv[3] == 'r' || *argv[3] == 'w' || *argv[3] == 'x')
+                {
+                    strncpy_s(arg3, argv[3], _TRUNCATE);
+                }
+                //bpm eax,0,1 (bad)
+                else
+                {
+                    dputs(QT_TRANSLATE_NOOP("DBG", "Size of memory breakpoint is invalid!"));
+                    return false;
+                }
+            }
+            //bpm eax,0
+        }
+        //bpm eax,1234
         else
-            strcpy_s(arg3, argv[2]);
+        {
+            //bpm eax,a
+            if(argc == 3 && strcmp(argv[2], "a") == 0)
+            {
+                strncpy_s(arg3, argv[2], _TRUNCATE);
+            }
+            else if(strcmp(argv[2], "r") == 0 || strcmp(argv[2], "w") == 0 || strcmp(argv[2], "x") == 0)
+            {
+                strncpy_s(arg3, argv[2], _TRUNCATE);
+            }
+            else
+            {
+                if(!valfromstring(argv[2], &size) || size == 0)
+                {
+                    dputs(QT_TRANSLATE_NOOP("DBG", "Size of memory breakpoint is invalid!"));
+                    return false;
+                }
+                if(argc > 3)
+                {
+                    if(argc > 4)
+                        strncpy_s(arg3, argv[4], _TRUNCATE);
+                    //bpm eax,1234,1
+                    if(*argv[3] == '1')
+                        restore = true;
+                    //bpm eax,1234,0
+                    else if(*argv[3] == '0')
+                        restore = false;
+                    //bpm eax,1234,a
+                    else
+                        strncpy_s(arg3, argv[3], _TRUNCATE);
+                }
+            }
+        }
     }
     DWORD type = UE_MEMORY;
     if(*arg3)
@@ -727,8 +807,11 @@ bool cbDebugSetMemoryBpx(int argc, char* argv[])
             break;
         }
     }
-    duint size = 0;
-    duint base = MemFindBaseAddr(addr, &size, true);
+    duint base;
+    if(size == 0)
+        base = MemFindBaseAddr(addr, &size, true);
+    else
+        base = MemFindBaseAddr(addr, nullptr, true);
     bool singleshoot = false;
     if(!restore)
         singleshoot = true;
