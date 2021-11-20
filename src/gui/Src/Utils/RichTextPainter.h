@@ -1,5 +1,4 @@
-#ifndef RICHTEXTPAINTER_H
-#define RICHTEXTPAINTER_H
+#pragma once
 
 #include <QString>
 #include <QColor>
@@ -36,7 +35,5 @@ public:
 
     //functions
     static void paintRichText(QPainter* painter, int x, int y, int w, int h, int xinc, const List & richText, CachedFontMetrics* fontMetrics);
-    static void htmlRichText(const List & richText, QString & textHtml, QString & textPlain);
+    static void htmlRichText(const List & richText, QString* textHtml, QString & textPlain);
 };
-
-#endif // RICHTEXTPAINTER_H

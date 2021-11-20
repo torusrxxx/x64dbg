@@ -1,5 +1,4 @@
-#ifndef CPUREGISTERSVIEW_H
-#define CPUREGISTERSVIEW_H
+#pragma once
 
 #include "RegistersView.h"
 
@@ -20,12 +19,8 @@ public slots:
     virtual void displayCustomContextMenuSlot(QPoint pos);
 
 protected slots:
-    void onIncrementAction();
-    void onDecrementAction();
     void onIncrementx87StackAction();
     void onDecrementx87StackAction();
-    void onZeroAction();
-    void onSetToOneAction();
     void onModifyAction();
     void onToggleValueAction();
     void onUndoAction();
@@ -35,10 +30,6 @@ protected slots:
     void onFollowInStack();
     void onFollowInMemoryMap();
     void onRemoveHardware();
-    void onIncrementPtrSize();
-    void onDecrementPtrSize();
-    void onPushAction();
-    void onPopAction();
     void onHighlightSlot();
     void ModifyFields(const QString & title, STRING_VALUE_TABLE_t* table, SIZE_T size);
     void disasmSelectionChangedSlot(dsint va);
@@ -50,14 +41,6 @@ private:
     CPUWidget* mParent;
     // context menu actions
     QAction* mFollowInDump;
-    QAction* wCM_Increment;
-    QAction* wCM_Decrement;
-    QAction* wCM_IncrementPtrSize;
-    QAction* wCM_DecrementPtrSize;
-    QAction* wCM_Push;
-    QAction* wCM_Pop;
-    QAction* wCM_Zero;
-    QAction* wCM_SetToOne;
     QAction* wCM_Modify;
     QAction* wCM_ToggleValue;
     QAction* wCM_Undo;
@@ -70,5 +53,3 @@ private:
     QAction* wCM_Decrementx87Stack;
     QAction* wCM_Highlight;
 };
-
-#endif // CPUREGISTERSVIEW_H

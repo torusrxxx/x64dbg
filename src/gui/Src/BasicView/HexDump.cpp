@@ -542,6 +542,14 @@ void HexDump::mouseReleaseEvent(QMouseEvent* event)
         AbstractTableView::mouseReleaseEvent(event);
 }
 
+void HexDump::wheelEvent(QWheelEvent* event)
+{
+    if(event->modifiers() == Qt::NoModifier)
+        AbstractTableView::wheelEvent(event);
+    else if(event->modifiers() == Qt::ControlModifier) // Zoom
+        Config()->zoomFont("HexDump", event);
+}
+
 void HexDump::keyPressEvent(QKeyEvent* event)
 {
     int key = event->key();
@@ -557,7 +565,7 @@ void HexDump::keyPressEvent(QKeyEvent* event)
             break;
         }
     }
-    if(modifiers == 0) //No modifier
+    if(modifiers == Qt::NoModifier)
     {
         //selStart -= selStart % granularity; //Align the selection to word boundary. TODO: Unaligned data?
         switch(key)
@@ -626,6 +634,8 @@ void HexDump::keyPressEvent(QKeyEvent* event)
             action = 0;
             verticalScrollBar()->triggerAction(QAbstractSlider::SliderSingleStepAdd);
             break;
+        default:
+            AbstractTableView::keyPressEvent(event);
         }
         if(action != 0)
         {

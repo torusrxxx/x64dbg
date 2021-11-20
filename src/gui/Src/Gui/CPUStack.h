@@ -1,5 +1,4 @@
-#ifndef CPUSTACK_H
-#define CPUSTACK_H
+#pragma once
 
 #include "HexDump.h"
 
@@ -22,6 +21,7 @@ public:
     QString paintContent(QPainter* painter, dsint rowBase, int rowOffset, int col, int x, int y, int w, int h) override;
     void contextMenuEvent(QContextMenuEvent* event);
     void mouseDoubleClickEvent(QMouseEvent* event);
+    void wheelEvent(QWheelEvent* event) override;
     void setupContextMenu();
     void updateFreezeStackAction();
 
@@ -29,8 +29,6 @@ signals:
     void displayReferencesWidget();
 
 public slots:
-    void pushSlot();
-    void popSlot();
     void stackDumpAt(duint addr, duint csp);
     void gotoCspSlot();
     void gotoCbpSlot();
@@ -84,5 +82,3 @@ private:
     std::vector<CPUCallStack> mCallstack;
     static int CPUStack::getCurrentFrame(const std::vector<CPUStack::CPUCallStack> & mCallstack, duint wVA);
 };
-
-#endif // CPUSTACK_H

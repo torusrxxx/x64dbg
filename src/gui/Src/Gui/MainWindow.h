@@ -1,5 +1,4 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#pragma once
 
 #include <QMainWindow>
 #include "Imports.h"
@@ -91,11 +90,6 @@ public slots:
     void displayVariables();
     void displayGraphWidget();
     void displayRunTrace();
-    void displayPreviousTab();
-    void displayNextTab();
-    void displayPreviousView();
-    void displayNextView();
-    void hideTab();
     void openSettings();
     void openAppearance();
     void openCalculator();
@@ -283,10 +277,8 @@ private slots:
     void on_actionImportSettings_triggered();
     void on_actionImportdatabase_triggered();
     void on_actionExportdatabase_triggered();
-    void on_actionRestartAdmin_triggered();
     void on_actionPlugins_triggered();
     void on_actionCheckUpdates_triggered();
     void on_actionDefaultTheme_triggered();
+    void on_actionAbout_Qt_triggered();
 };
-
-#endif // MAINWINDOW_H

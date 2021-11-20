@@ -1,5 +1,4 @@
-#ifndef CONFIGURATION_H
-#define CONFIGURATION_H
+#pragma once
 
 #include <QObject>
 #include <QKeySequence>
@@ -20,6 +19,7 @@
 
 class MenuBuilder;
 class QAction;
+class QWheelEvent;
 
 class Configuration : public QObject
 {
@@ -68,6 +68,8 @@ public:
     void setPluginShortcut(const QString & key_id, QString description, QString defaultShortcut, bool global);
     void setupWindowPos(QWidget* window);
     void saveWindowPos(QWidget* window);
+
+    void zoomFont(const QString & fontName, QWheelEvent* event);
 
     //default setting maps
     QMap<QString, QColor> defaultColors;
@@ -127,5 +129,3 @@ private:
 
     mutable bool noMoreMsgbox;
 };
-
-#endif // CONFIGURATION_H

@@ -61,6 +61,7 @@ void SettingsDialog::LoadSettings()
     settings.engineCalcType = calc_unsigned;
     settings.engineBreakpointType = break_int3short;
     settings.engineUndecorateSymbolNames = true;
+    settings.engineEnableDebugPrivilege = true;
     settings.engineEnableSourceDebugging = false;
     settings.engineEnableTraceRecordDuringTrace = true;
     settings.engineNoScriptTimeout = false;
@@ -536,7 +537,7 @@ void SettingsDialog::AddExceptionFilterToList(ExceptionFilter filter)
     unsigned long start = filter.range.start;
     unsigned long end = filter.range.end;
 
-    for(int i = settings.exceptionFilters->size() - 1; i > -1; i--)
+    for(int i = settings.exceptionFilters->size() - 1; i > 0; i--)
     {
         unsigned long curStart = settings.exceptionFilters->at(i).range.start;
         unsigned long curEnd = settings.exceptionFilters->at(i).range.end;

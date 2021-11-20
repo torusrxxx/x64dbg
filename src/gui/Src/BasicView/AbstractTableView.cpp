@@ -245,7 +245,8 @@ void AbstractTableView::paintEvent(QPaintEvent* event)
     }
 
     // Paints background
-    wPainter.fillRect(wPainter.viewport(), QBrush(mBackgroundColor));
+    if(mBackgroundColor.alpha() == 255) // The secret code to allow the user to set a background image in style.css
+        wPainter.fillRect(wPainter.viewport(), QBrush(mBackgroundColor));
 
     // Paints header
     if(mHeader.isVisible == true)
@@ -571,25 +572,40 @@ void AbstractTableView::mouseDoubleClickEvent(QMouseEvent* event)
 
 void AbstractTableView::wheelEvent(QWheelEvent* event)
 {
-    int numDegrees = event->delta() / 8;
-    int numSteps = numDegrees / 15;
+    QPoint numDegrees = event->angleDelta() / 8;
+    QPoint numSteps = numDegrees / 15;
 
-    if(numSteps > 0)
+    if(event->modifiers() == Qt::NoModifier)
     {
-        if(mMouseWheelScrollDelta > 0)
-            for(int i = 0; i < mMouseWheelScrollDelta * numSteps; i++)
-                verticalScrollBar()->triggerAction(QAbstractSlider::SliderSingleStepSub);
-        else // -1 : one screen at a time
-            verticalScrollBar()->triggerAction(QAbstractSlider::SliderPageStepSub);
+        if(numSteps.y() > 0)
+        {
+            if(mMouseWheelScrollDelta > 0)
+                for(int i = 0; i < mMouseWheelScrollDelta * numSteps.y(); i++)
+                    verticalScrollBar()->triggerAction(QAbstractSlider::SliderSingleStepSub);
+            else // -1 : one screen at a time
+                verticalScrollBar()->triggerAction(QAbstractSlider::SliderPageStepSub);
+        }
+        else if(numSteps.y() < 0)
+        {
+            if(mMouseWheelScrollDelta > 0)
+                for(int i = 0; i < mMouseWheelScrollDelta * numSteps.y() * -1; i++)
+                    verticalScrollBar()->triggerAction(QAbstractSlider::SliderSingleStepAdd);
+            else // -1 : one screen at a time
+                verticalScrollBar()->triggerAction(QAbstractSlider::SliderPageStepAdd);
+        }
+        else if(numSteps.x() > 0)
+        {
+            for(int i = 0; i < 20 * numSteps.x(); i++)
+                horizontalScrollBar()->triggerAction(QAbstractSlider::SliderSingleStepSub);
+        }
+        else if(numSteps.x() < 0)
+        {
+            for(int i = 0; i < 20 * numSteps.x() * -1; i++)
+                horizontalScrollBar()->triggerAction(QAbstractSlider::SliderSingleStepAdd);
+        }
     }
-    else
-    {
-        if(mMouseWheelScrollDelta > 0)
-            for(int i = 0; i < mMouseWheelScrollDelta * numSteps * -1; i++)
-                verticalScrollBar()->triggerAction(QAbstractSlider::SliderSingleStepAdd);
-        else // -1 : one screen at a time
-            verticalScrollBar()->triggerAction(QAbstractSlider::SliderPageStepAdd);
-    }
+    else if(event->modifiers() == Qt::ControlModifier) // Zoom
+        Config()->zoomFont("AbstractTableView", event);
 }
 
 
@@ -631,7 +647,7 @@ void AbstractTableView::leaveEvent(QEvent* event)
 void AbstractTableView::keyPressEvent(QKeyEvent* event)
 {
     int wKey = event->key();
-    if(event->modifiers())
+    if(event->modifiers() != Qt::NoModifier && event->modifiers() != Qt::KeypadModifier)
         return;
 
     if(wKey == Qt::Key_Up)

@@ -1,5 +1,4 @@
-#ifndef REGISTERSVIEW_H
-#define REGISTERSVIEW_H
+#pragma once
 
 #include <QScrollArea>
 #include <QSet>
@@ -208,7 +207,6 @@ protected:
     QSet<REGISTER_NAME> mLABELDISPLAY;
     QSet<REGISTER_NAME> mONLYMODULEANDLABELDISPLAY;
     QSet<REGISTER_NAME> mUNDODISPLAY;
-    QSet<REGISTER_NAME> mSETONEZEROTOGGLE;
     QSet<REGISTER_NAME> mMODIFYDISPLAY;
     QSet<REGISTER_NAME> mFIELDVALUE;
     QSet<REGISTER_NAME> mTAGWORD;
@@ -271,5 +269,3 @@ protected:
     QAction* SIMDUQWord;
     QAction* SIMDHQWord;
 };
-
-#endif // REGISTERSVIEW_H

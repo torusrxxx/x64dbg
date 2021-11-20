@@ -1,5 +1,4 @@
-#ifndef MEMORYMAPVIEW_H
-#define MEMORYMAPVIEW_H
+#pragma once
 
 #include "StdTable.h"
 
@@ -21,6 +20,7 @@ public slots:
     void stateChangedSlot(DBGSTATE state);
     void followDumpSlot();
     void followDisassemblerSlot();
+    void followSymbolsSlot();
     void doubleClickedSlot();
     void memoryExecuteSingleshootToggleSlot();
     void memoryAllocateSlot();
@@ -49,6 +49,7 @@ private:
 
     QAction* mFollowDump;
     QAction* mFollowDisassembly;
+    QAction* mFollowSymbols;
     QAction* mSwitchView;
     QAction* mPageMemoryRights;
     QAction* mDumpMemory;
@@ -82,5 +83,3 @@ private:
 
     duint mCipBase;
 };
-
-#endif // MEMORYMAPVIEW_H

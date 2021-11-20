@@ -201,7 +201,7 @@ bool ExpressionFunctions::Unregister(const String & name)
         return false;
     auto aliases = found->second.aliases;
     mFunctions.erase(found);
-    for(const auto & alias : found->second.aliases)
+    for(const auto & alias : aliases)
         Unregister(alias);
     return true;
 }
@@ -220,7 +220,7 @@ bool ExpressionFunctions::Call(const String & name, ExpressionValue & result, st
         if(argv[i].type != f.argTypes[i] && f.argTypes[i] != ValueTypeAny)
             return false;
     }
-    return f.cbFunction(&result, argv.size(), argv.data(), f.userdata);
+    return f.cbFunction(&result, (int)argv.size(), argv.data(), f.userdata);
 }
 
 bool ExpressionFunctions::GetType(const String & name, ValueType & returnType, std::vector<ValueType> & argTypes)

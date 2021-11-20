@@ -1,5 +1,4 @@
-#ifndef GOTODIALOG_H
-#define GOTODIALOG_H
+#pragma once
 
 #include <QDialog>
 #include "Imports.h"
@@ -37,6 +36,7 @@ private slots:
     void on_buttonOk_clicked();
     void finishedSlot(int result);
     void textEditedSlot(QString text);
+    void linkActivated(const QString & link);
 
 private:
     Ui::GotoDialog* ui;
@@ -46,5 +46,3 @@ private:
     void setOkEnabled(bool enabled);
     QString mCompletionText;
 };
-
-#endif // GOTODIALOG_H

@@ -1,5 +1,4 @@
-#ifndef DISASSEMBLY_H
-#define DISASSEMBLY_H
+#pragma once
 
 #include "AbstractTableView.h"
 #include "QBeaEngine.h"
@@ -25,6 +24,7 @@ public:
     void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
 
     // Keyboard Management
     void keyPressEvent(QKeyEvent* event) override;
@@ -240,5 +240,3 @@ protected:
     bool mNoCurrentModuleText;
     bool mIsMain = false;
 };
-
-#endif // DISASSEMBLY_H

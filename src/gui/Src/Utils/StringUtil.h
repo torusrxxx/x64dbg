@@ -1,5 +1,4 @@
-#ifndef STRINGUTIL_H
-#define STRINGUTIL_H
+#pragma once
 
 #include <sstream>
 #include <iomanip>
@@ -70,6 +69,13 @@ inline QString ToWordString(unsigned short Value)
     return QString(temp);
 }
 
+inline QString ToDwordString(unsigned int Value)
+{
+    char temp[16];
+    sprintf_s(temp, "%08X", Value);
+    return QString(temp);
+}
+
 template<typename T>
 inline QString ToFloatingString(const void* buffer, int precision)
 {
@@ -136,5 +142,3 @@ QString FILETIMEToDate(const FILETIME & date);
 bool GetCommentFormat(duint addr, QString & comment, bool* autoComment = nullptr);
 
 QString EscapeCh(QChar ch);
-
-#endif // STRINGUTIL_H

@@ -6,6 +6,7 @@
 #include <QFileDialog>
 #include <QMimeData>
 #include <QDesktopServices>
+#include <QStatusTipEvent>
 #include "Configuration.h"
 #include "SettingsDialog.h"
 #include "AppearanceDialog.h"
@@ -110,6 +111,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(Bridge::getBridge(), SIGNAL(addFavouriteItem(int, QString, QString)), this, SLOT(addFavouriteItem(int, QString, QString)));
     connect(Bridge::getBridge(), SIGNAL(setFavouriteItemShortcut(int, QString, QString)), this, SLOT(setFavouriteItemShortcut(int, QString, QString)));
     connect(Bridge::getBridge(), SIGNAL(selectInMemoryMap(duint)), this, SLOT(displayMemMapWidget()));
+    connect(Bridge::getBridge(), SIGNAL(symbolSelectModule(duint)), this, SLOT(displaySymbolWidget()));
     connect(Bridge::getBridge(), SIGNAL(closeApplication()), this, SLOT(close()));
 
     // Setup menu API
@@ -261,6 +263,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     // Setup signals/slots
     connect(mCmdLineEdit, SIGNAL(returnPressed()), this, SLOT(executeCommand()));
+    makeCommandAction(ui->actionRestartAdmin, "restartadmin");
     makeCommandAction(ui->actionStepOver, "StepOver");
     makeCommandAction(ui->actionStepInto, "StepInto");
     connect(ui->actionCommand, SIGNAL(triggered()), this, SLOT(setFocusToCommandBar()));
@@ -329,11 +332,11 @@ MainWindow::MainWindow(QWidget* parent)
     connect(ui->actionNotes, SIGNAL(triggered()), this, SLOT(displayNotesWidget()));
     connect(ui->actionHandles, SIGNAL(triggered()), this, SLOT(displayHandlesWidget()));
     connect(ui->actionGraph, SIGNAL(triggered()), this, SLOT(displayGraphWidget()));
-    connect(ui->actionPreviousTab, SIGNAL(triggered()), this, SLOT(displayPreviousTab()));
-    connect(ui->actionNextTab, SIGNAL(triggered()), this, SLOT(displayNextTab()));
-    connect(ui->actionPreviousView, SIGNAL(triggered()), this, SLOT(displayPreviousView()));
-    connect(ui->actionNextView, SIGNAL(triggered()), this, SLOT(displayNextView()));
-    connect(ui->actionHideTab, SIGNAL(triggered()), this, SLOT(hideTab()));
+    connect(ui->actionPreviousTab, SIGNAL(triggered()), mTabWidget, SLOT(showPreviousTab()));
+    connect(ui->actionNextTab, SIGNAL(triggered()), mTabWidget, SLOT(showNextTab()));
+    connect(ui->actionPreviousView, SIGNAL(triggered()), mTabWidget, SLOT(showPreviousView()));
+    connect(ui->actionNextView, SIGNAL(triggered()), mTabWidget, SLOT(showNextView()));
+    connect(ui->actionHideTab, SIGNAL(triggered()), mTabWidget, SLOT(deleteCurrentTab()));
     makeCommandAction(ui->actionStepIntoSource, "TraceIntoConditional src.line(cip) && !src.disp(cip)");
     makeCommandAction(ui->actionStepOverSource, "TraceOverConditional src.line(cip) && !src.disp(cip)");
     makeCommandAction(ui->actionseStepInto, "seStepInto");
@@ -590,9 +593,12 @@ void MainWindow::closeEvent(QCloseEvent* event)
         msgbox.setText(tr("The debuggee is still running and will be terminated if you exit. Do you really want to exit?"));
         msgbox.setWindowTitle(tr("Debuggee is still running"));
         msgbox.setWindowIcon(DIcon("bug.png"));
-        msgbox.addButton(QMessageBox::Yes);
-        msgbox.addButton(QMessageBox::No);
-        msgbox.setDefaultButton(QMessageBox::No);
+        msgbox.addButton(QMessageBox::Yes)->setText(tr("&Exit"));
+        msgbox.addButton(QMessageBox::Cancel)->setText(tr("&Cancel"));
+        msgbox.addButton(QMessageBox::Abort)->setText(tr("&Stop debugging"));
+        msgbox.addButton(QMessageBox::Retry)->setText(tr("&Restart debugging"));
+        msgbox.setDefaultButton(QMessageBox::Cancel);
+        msgbox.setEscapeButton(QMessageBox::Cancel);
         msgbox.setCheckBox(cb);
 
         QObject::connect(cb, &QCheckBox::toggled, [](bool checked)
@@ -600,7 +606,12 @@ void MainWindow::closeEvent(QCloseEvent* event)
             Config()->setBool("Gui", "ShowExitConfirmation", !checked);
         });
 
-        if(msgbox.exec() != QMessageBox::Yes)
+        auto code = msgbox.exec();
+        if(code == QMessageBox::Retry)
+            restartDebugging();
+        if(code == QMessageBox::Abort)
+            DbgCmdExec("stop");
+        if(code != QMessageBox::Yes)
         {
             event->ignore();
             return;
@@ -1077,6 +1088,12 @@ bool MainWindow::event(QEvent* event)
     {
         mTabWidget->setCurrentIndex(mTabWidget->currentIndex());
     }
+    else if(event->type() == QEvent::StatusTip)
+    {
+        QStatusTipEvent* tip = dynamic_cast<QStatusTipEvent*>(event);
+        mLastLogLabel->showMessage(tip->tip());
+        return true;
+    }
 
     return QMainWindow::event(event);
 }
@@ -1158,31 +1175,6 @@ void MainWindow::displayGraphWidget()
 {
     showQWidgetTab(mCpuWidget);
     mCpuWidget->setGraphFocus();
-}
-
-void MainWindow::displayPreviousTab()
-{
-    mTabWidget->showPreviousTab();
-}
-
-void MainWindow::displayNextTab()
-{
-    mTabWidget->showNextTab();
-}
-
-void MainWindow::displayPreviousView()
-{
-    mTabWidget->showPreviousView();
-}
-
-void MainWindow::displayNextView()
-{
-    mTabWidget->showNextView();
-}
-
-void MainWindow::hideTab()
-{
-    mTabWidget->deleteCurrentTab();
 }
 
 void MainWindow::openSettings()
@@ -1794,6 +1786,11 @@ void MainWindow::changeCommandLine()
     }
 }
 
+static void onlineManual()
+{
+    QDesktopServices::openUrl(QUrl("http://help.x64dbg.com"));
+}
+
 void MainWindow::displayManual()
 {
     duint setting = 0;
@@ -1801,10 +1798,17 @@ void MainWindow::displayManual()
     {
         // Open the Windows CHM in the upper directory
         if(!QDesktopServices::openUrl(QUrl(QUrl::fromLocalFile(QString("%1/../x64dbg.chm").arg(QCoreApplication::applicationDirPath())))))
-            SimpleErrorBox(this, tr("Error"), tr("Manual cannot be opened. Please check if x64dbg.chm exists and ensure there is no other problems with your system."));
+        {
+            QMessageBox messagebox(QMessageBox::Critical, tr("Error"),
+                                   tr("Manual cannot be opened. Please check if x64dbg.chm exists and ensure there is no other problems with your system.") + '\n'
+                                   + tr("Do you want to open online manual at http://help.x64dbg.com ?"),
+                                   QMessageBox::Yes | QMessageBox::No);
+            if(messagebox.exec() == QMessageBox::Yes)
+                onlineManual();
+        }
     }
     else
-        QDesktopServices::openUrl(QUrl("http://help.x64dbg.com"));
+        onlineManual();
 }
 
 void MainWindow::canClose()
@@ -1946,6 +1950,7 @@ void MainWindow::updateFavouriteTools()
     delete actionManageFavourites;
     mFavouriteToolbar->clear();
     actionManageFavourites = new QAction(DIcon("star.png"), tr("&Manage Favourite Tools..."), this);
+    actionManageFavourites->setStatusTip(tr("Open the Favourites dialog to manage the favourites menu"));
     for(unsigned int i = 1; BridgeSettingGet("Favourite", QString("Tool%1").arg(i).toUtf8().constData(), buffer); i++)
     {
         QString toolPath = QString(buffer);
@@ -1955,10 +1960,13 @@ void MainWindow::updateFavouriteTools()
         if(BridgeSettingGet("Favourite", QString("ToolShortcut%1").arg(i).toUtf8().constData(), buffer))
             if(*buffer && strcmp(buffer, "NOT_SET") != 0)
                 setGlobalShortcut(newAction, QKeySequence(QString(buffer)));
+        QString description;
         if(BridgeSettingGet("Favourite", QString("ToolDescription%1").arg(i).toUtf8().constData(), buffer))
-            newAction->setText(QString(buffer));
+            description = QString(buffer);
         else
-            newAction->setText(toolPath);
+            description = toolPath;
+        newAction->setText(description);
+        newAction->setStatusTip(description);
         // Get the icon of the executable
         QString file, cmd;
         QIcon icon;
@@ -1987,10 +1995,13 @@ void MainWindow::updateFavouriteTools()
         if(BridgeSettingGet("Favourite", QString("ScriptShortcut%1").arg(i).toUtf8().constData(), buffer))
             if(*buffer && strcmp(buffer, "NOT_SET") != 0)
                 setGlobalShortcut(newAction, QKeySequence(QString(buffer)));
+        QString description;
         if(BridgeSettingGet("Favourite", QString("ScriptDescription%1").arg(i).toUtf8().constData(), buffer))
-            newAction->setText(QString(buffer));
+            description = QString(buffer);
         else
-            newAction->setText(scriptPath);
+            description = scriptPath;
+        newAction->setText(description);
+        newAction->setStatusTip(description);
         connect(newAction, SIGNAL(triggered()), this, SLOT(clickFavouriteTool()));
         newAction->setIcon(DIcon("script-code.png"));
         ui->menuFavourites->addAction(newAction);
@@ -2006,6 +2017,7 @@ void MainWindow::updateFavouriteTools()
     for(unsigned int i = 1; BridgeSettingGet("Favourite", QString("Command%1").arg(i).toUtf8().constData(), buffer); i++)
     {
         QAction* newAction = new QAction(QString(buffer), actionManageFavourites);
+        newAction->setStatusTip(QString(buffer));
         // Set up user data to be used in clickFavouriteTool()
         newAction->setData(QVariant(QString("Command")));
         if(BridgeSettingGet("Favourite", QString("CommandShortcut%1").arg(i).toUtf8().constData(), buffer))
@@ -2063,7 +2075,7 @@ void MainWindow::clickFavouriteTool()
             auto format = toolPath.mid(sfStart + 2, sfEnd - sfStart - 2);
             toolPath.replace(sfStart, sfEnd - sfStart + 2, stringFormatInline(format));
         }
-        mLastLogLabel->setText(toolPath);
+        GuiAddLogMessage(tr("Starting tool %1\n").arg(toolPath).toUtf8().constData());
         PROCESS_INFORMATION procinfo;
         STARTUPINFO startupinfo;
         memset(&procinfo, 0, sizeof(PROCESS_INFORMATION));
@@ -2103,6 +2115,7 @@ void MainWindow::chooseLanguage()
     {
         QDir translationsDir(QString("%1/../translations/").arg(QCoreApplication::applicationDirPath()));
         QFile file(translationsDir.absoluteFilePath(QString("x64dbg_%1.qm").arg(localeName)));
+        // A translation file less than 0.5KB is probably not useful
         if(file.size() < 512)
         {
             QMessageBox msg(this);
@@ -2337,11 +2350,6 @@ void MainWindow::onMenuCustomized()
     }
 }
 
-void MainWindow::on_actionRestartAdmin_triggered()
-{
-    DbgCmdExec("restartadmin");
-}
-
 void MainWindow::on_actionPlugins_triggered()
 {
     QDesktopServices::openUrl(QUrl("http://plugins.x64dbg.com"));
@@ -2368,6 +2376,11 @@ void MainWindow::on_actionDefaultTheme_triggered()
     // Remove custom colors
     BridgeSettingSet("Colors", "CustomColorCount", nullptr);
     updateDarkTitleBar();
+}
+
+void MainWindow::on_actionAbout_Qt_triggered()
+{
+    QMessageBox::aboutQt(this);
 }
 
 void MainWindow::updateStyle()

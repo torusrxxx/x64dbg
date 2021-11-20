@@ -331,10 +331,10 @@ extern "C" DLL_EXPORT bool _dbg_addrinfoget(duint addr, SEGMENTREG segment, BRID
         else
         {
             String comment;
-            DWORD dwDisplacement;
+            duint disp;
             char fileName[MAX_STRING_SIZE] = {};
             int lineNumber = 0;
-            if(!bNoSourceLineAutoComments && SymGetSourceLine(addr, fileName, &lineNumber, &dwDisplacement) && !dwDisplacement)
+            if(!bNoSourceLineAutoComments && SymGetSourceLine(addr, fileName, &lineNumber, &disp) && !disp)
             {
 
                 char* actualName = fileName;
@@ -366,7 +366,7 @@ extern "C" DLL_EXPORT bool _dbg_addrinfoget(duint addr, SEGMENTREG segment, BRID
 
                 if(addr == lastContext.cip && (cp.GetId() == ZYDIS_MNEMONIC_SYSCALL || (cp.GetId() == ZYDIS_MNEMONIC_INT && cp[0].imm.value.u == 0x2e)))
                 {
-                    auto syscallName = SyscallToName(lastContext.cax);
+                    auto syscallName = SyscallToName((unsigned int)lastContext.cax);
                     if(!syscallName.empty())
                     {
                         if(!comment.empty())
@@ -1016,6 +1016,7 @@ extern "C" DLL_EXPORT duint _dbg_sendmessage(DBGMSG type, void* param1, void* pa
         valuesetsignedcalc(!settingboolget("Engine", "CalculationType")); //0:signed, 1:unsigned
         SetEngineVariable(UE_ENGINE_SET_DEBUG_PRIVILEGE, settingboolget("Engine", "EnableDebugPrivilege"));
         SetEngineVariable(UE_ENGINE_SAFE_ATTACH, settingboolget("Engine", "SafeAttach"));
+        SetEngineVariable(UE_ENGINE_MEMBP_ALT, settingboolget("Engine", "MembpAlt"));
         bOnlyCipAutoComments = settingboolget("Disassembler", "OnlyCipAutoComments");
         bNoSourceLineAutoComments = settingboolget("Disassembler", "NoSourceLineAutoComments");
         bListAllPages = settingboolget("Engine", "ListAllPages");
