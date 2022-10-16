@@ -14,7 +14,7 @@ CommonActions::CommonActions(QWidget* parent, ActionHelperFuncs funcs, GetSelect
 {
 }
 
-void CommonActions::build(MenuBuilder* builder, int actions)
+void CommonActions::build(MenuBuilder* builder, int actions, const QString & text)
 {
     // Condition Lambda
     auto wIsDebugging = [this](QMenu*)
@@ -27,23 +27,27 @@ void CommonActions::build(MenuBuilder* builder, int actions)
         DbgMemRead(mGetSelection(), (unsigned char*)&ptr, sizeof(duint));
         return DbgMemIsValidReadPtr(ptr);
     };
+    auto txt = [text](const QString & defaultText)
+    {
+        return text.isNull() ? defaultText : text;
+    };
 
     // Menu action
     if(actions & ActionDisasm)
     {
-        builder->addAction(makeShortcutAction(DIcon(ArchValue("processor32", "processor64")), tr("Follow in Disassembler"), std::bind(&CommonActions::followDisassemblySlot, this), "ActionFollowDisasm"), wIsDebugging);
+        builder->addAction(makeShortcutAction(DIcon(ArchValue("processor32", "processor64")), txt(tr("Follow in Disassembler")), std::bind(&CommonActions::followDisassemblySlot, this), "ActionFollowDisasm"), wIsDebugging);
     }
     if(actions & ActionDisasmData)
     {
-        builder->addAction(makeCommandAction(DIcon("processor32"), ArchValue(tr("&Follow DWORD in Disassembler"), tr("&Follow QWORD in Disassembler")), "disasm [$]", "ActionFollowDwordQwordDisasm"), wIsValidReadPtrCallback);
+        builder->addAction(makeCommandAction(DIcon("processor32"), txt(ArchValue(tr("&Follow DWORD in Disassembler"), tr("&Follow QWORD in Disassembler"))), "disasm [$]", "ActionFollowDwordQwordDisasm"), wIsValidReadPtrCallback);
     }
     if(actions & ActionDump)
     {
-        builder->addAction(makeCommandAction(DIcon("dump"), tr("Follow in Dump"), "dump $"));
+        builder->addAction(makeCommandAction(DIcon("dump"), txt(tr("Follow in Dump")), "dump $"));
     }
     if(actions & ActionDumpData)
     {
-        builder->addAction(makeCommandAction(DIcon("dump"), ArchValue(tr("&Follow DWORD in Current Dump"), tr("&Follow QWORD in Current Dump")), "dump [$]", "ActionFollowDwordQwordDump"), wIsValidReadPtrCallback);
+        builder->addAction(makeCommandAction(DIcon("dump"), txt(ArchValue(tr("&Follow DWORD in Current Dump"), tr("&Follow QWORD in Current Dump"))), "dump [$]", "ActionFollowDwordQwordDump"), wIsValidReadPtrCallback);
     }
     if(actions & ActionDumpN)
     {
@@ -62,11 +66,11 @@ void CommonActions::build(MenuBuilder* builder, int actions)
             if(DbgMemIsValidReadPtr(selectedData))
                 DbgCmdExec(QString("dump [%1], %2").arg(ToPtrString(selectedData)).arg(i + 1));
         }));
-        builder->addMenu(makeMenu(DIcon("dump"), ArchValue(tr("Follow DWORD in Dump"), tr("Follow QWORD in Dump"))), followDumpNMenu);
+        builder->addMenu(makeMenu(DIcon("dump"), txt(ArchValue(tr("Follow DWORD in Dump"), tr("Follow QWORD in Dump")))), followDumpNMenu);
     }
     if(actions & ActionStackDump)
     {
-        builder->addAction(makeCommandAction(DIcon("stack"), tr("Follow in Stack"), "sdump $", "ActionFollowStack"), [this](QMenu*)
+        builder->addAction(makeCommandAction(DIcon("stack"), txt(tr("Follow in Stack")), "sdump $", "ActionFollowStack"), [this](QMenu*)
         {
             auto start = mGetSelection();
             return (DbgMemIsValidReadPtr(start) && DbgMemFindBaseAddr(start, 0) == DbgMemFindBaseAddr(DbgValFromString("csp"), 0));
@@ -74,11 +78,11 @@ void CommonActions::build(MenuBuilder* builder, int actions)
     }
     if(actions & ActionMemoryMap)
     {
-        builder->addAction(makeCommandAction(DIcon("memmap_find_address_page"), tr("Follow in Memory Map"), "memmapdump $", "ActionFollowMemMap"), wIsDebugging);
+        builder->addAction(makeCommandAction(DIcon("memmap_find_address_page"), txt(tr("Follow in Memory Map")), "memmapdump $", "ActionFollowMemMap"), wIsDebugging);
     }
     if(actions & ActionGraph)
     {
-        builder->addAction(makeShortcutAction(DIcon("graph"), tr("Graph"), std::bind(&CommonActions::graphSlot, this), "ActionGraph"));
+        builder->addAction(makeShortcutAction(DIcon("graph"), txt(tr("Graph")), std::bind(&CommonActions::graphSlot, this), "ActionGraph"));
     }
     if(actions & ActionBreakpoint)
     {
@@ -104,7 +108,7 @@ void CommonActions::build(MenuBuilder* builder, int actions)
         hodl.replaceSlotAction[2] = makeMenuAction(hodl.replaceSlotMenu, DIcon("breakpoint_execute_slot3"), tr("Replace Slot %1 (Unknown)").arg(3), std::bind(&CommonActions::setHwBpOnSlot2ActionSlot, this));
         hodl.replaceSlotAction[3] = makeMenuAction(hodl.replaceSlotMenu, DIcon("breakpoint_execute_slot4"), tr("Replace Slot %1 (Unknown)").arg(4), std::bind(&CommonActions::setHwBpOnSlot3ActionSlot, this));
 
-        builder->addMenu(makeMenu(DIcon("breakpoint"), tr("Breakpoint")), [this, hodl](QMenu * menu)
+        builder->addMenu(makeMenu(DIcon("breakpoint"), txt(tr("Breakpoint"))), [this, hodl](QMenu * menu)
         {
             auto selection = mGetSelection();
             if(selection == 0)
@@ -156,15 +160,15 @@ void CommonActions::build(MenuBuilder* builder, int actions)
     }
     if(actions & ActionLabel)
     {
-        builder->addAction(makeShortcutAction(DIcon("label"), tr("Label Current Address"), std::bind(&CommonActions::setLabelSlot, this), "ActionSetLabel"), wIsDebugging);
+        builder->addAction(makeShortcutAction(DIcon("label"), txt(tr("Label Current Address")), std::bind(&CommonActions::setLabelSlot, this), "ActionSetLabel"), wIsDebugging);
     }
     if(actions & ActionComment)
     {
-        builder->addAction(makeShortcutAction(DIcon("comment"), tr("Comment"), std::bind(&CommonActions::setCommentSlot, this), "ActionSetComment"), wIsDebugging);
+        builder->addAction(makeShortcutAction(DIcon("comment"), txt(tr("Comment")), std::bind(&CommonActions::setCommentSlot, this), "ActionSetComment"), wIsDebugging);
     }
     if(actions & ActionBookmark)
     {
-        builder->addAction(makeShortcutAction(DIcon("bookmark_toggle"), tr("Toggle Bookmark"), std::bind(&CommonActions::setBookmarkSlot, this), "ActionToggleBookmark"), wIsDebugging);
+        builder->addAction(makeShortcutAction(DIcon("bookmark_toggle"), txt(tr("Toggle Bookmark")), std::bind(&CommonActions::setBookmarkSlot, this), "ActionToggleBookmark"), wIsDebugging);
     }
     if(actions & ActionNewOrigin)
     {
@@ -172,7 +176,7 @@ void CommonActions::build(MenuBuilder* builder, int actions)
     }
     if(actions & ActionNewThread)
     {
-        builder->addAction(makeShortcutAction(DIcon("createthread"), tr("Create New Thread Here"), std::bind(&CommonActions::createThreadSlot, this), "ActionCreateNewThreadHere"));
+        builder->addAction(makeShortcutAction(DIcon("createthread"), txt(tr("Create New Thread Here")), std::bind(&CommonActions::createThreadSlot, this), "ActionCreateNewThreadHere"));
     }
     if(actions & ActionWatch)
     {

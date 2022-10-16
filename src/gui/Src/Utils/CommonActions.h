@@ -46,7 +46,11 @@ public:
     using GetSelectionFunc = std::function<duint()>;
 
     explicit CommonActions(QWidget* parent, ActionHelperFuncs funcs, GetSelectionFunc getSelection);
-    void build(MenuBuilder* builder, int actions);
+
+    // Add one or more common actions to the menu builder
+    // text argument can override the default text to preserve hotkeys
+    void build(MenuBuilder* builder, int actions, const QString & text = QString());
+
     //Reserved for future use (submenu for Dump and Search with more addresses)
     //void build(MenuBuilder* builder, int actions, std::function<void(QList<std::pair<QString, duint>>&, CommonActionsList)> additionalAddress);
 
