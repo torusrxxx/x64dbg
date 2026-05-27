@@ -3,6 +3,8 @@
 #include "Bridge.h"
 #include <QFile>
 #include <atomic>
+#include <list>
+#include <unordered_map>
 #include "TraceFileDump.h"
 #include "zydis_wrapper.h"
 
@@ -87,8 +89,14 @@ private:
     friend class TraceFilePage;
 
     TraceFileParser* parser = nullptr;
+    using PageMap = std::map<Range, TraceFilePage, RangeCompare>;
     std::map<Range, TraceFilePage, RangeCompare> pages;
+    std::list<Range> pageLruList;
+    std::unordered_map<TRACEINDEX, std::list<Range>::iterator> pageLruMap;
     TraceFilePage* getPage(TRACEINDEX index, TRACEINDEX* base);
+    void touchPageLru(TRACEINDEX pageStart);
+    void erasePage(Range range);
+    void clearPageCache();
     TraceFileDump dump;
     void buildDump(TRACEINDEX index);
 

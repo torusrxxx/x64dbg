@@ -26,8 +26,6 @@ public:
     int MemoryAccessCount(TRACEINDEX index) const;
     void MemoryAccessInfo(TRACEINDEX index, duint* address, duint* oldMemory, duint* newMemory, bool* isValid) const;
 
-    FILETIME lastAccessed; //system user time
-
     void updateInstructions();
 
 private:

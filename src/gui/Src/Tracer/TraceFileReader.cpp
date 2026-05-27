@@ -31,6 +31,7 @@ bool TraceFileReader::Open(const QString & fileName)
         parser->requestInterruption();
         parser->wait();
     }
+    clearPageCache();
     error = true;
     dump.clear();
     traceFile.setFileName(fileName);
@@ -63,6 +64,7 @@ void TraceFileReader::Close()
         parser->wait();
     }
     traceFile.close();
+    clearPageCache();
     progress.store(0);
     length = 0;
     fileIndex.clear();
@@ -80,6 +82,7 @@ bool TraceFileReader::Delete()
         parser->wait();
     }
     bool value = traceFile.remove();
+    clearPageCache();
     progress.store(0);
     length = 0;
     fileIndex.clear();
@@ -88,6 +91,44 @@ bool TraceFileReader::Delete()
     error = false;
     errorMessage.clear();
     return value;
+}
+
+void TraceFileReader::touchPageLru(TRACEINDEX pageStart)
+{
+    const auto lruEntry = pageLruMap.find(pageStart);
+    if(lruEntry == pageLruMap.cend())
+        return;
+
+    if(lruEntry->second != pageLruList.begin())
+        pageLruList.splice(pageLruList.begin(), pageLruList, lruEntry->second);
+    lruEntry->second = pageLruList.begin();
+}
+
+void TraceFileReader::erasePage(Range range)
+{
+    const auto lruEntry = pageLruMap.find(range.first);
+    if(lruEntry != pageLruMap.cend())
+    {
+        pageLruList.erase(lruEntry->second);
+        pageLruMap.erase(lruEntry);
+    }
+
+    if(lastAccessedPage && range.first == lastAccessedIndexOffset)
+    {
+        lastAccessedPage = nullptr;
+        lastAccessedIndexOffset = 0;
+    }
+
+    pages.erase(range);
+}
+
+void TraceFileReader::clearPageCache()
+{
+    pages.clear();
+    pageLruList.clear();
+    pageLruMap.clear();
+    lastAccessedPage = nullptr;
+    lastAccessedIndexOffset = 0;
 }
 
 void TraceFileReader::parseFinishedSlot()
@@ -293,6 +334,7 @@ TraceFilePage* TraceFileReader::getPage(TRACEINDEX index, TRACEINDEX* base)
     {
         if(index >= lastAccessedIndexOffset && index < lastAccessedIndexOffset + lastAccessedPage->Length())
         {
+            touchPageLru(lastAccessedIndexOffset);
             *base = lastAccessedIndexOffset;
             return lastAccessedPage;
         }
@@ -301,13 +343,11 @@ TraceFilePage* TraceFileReader::getPage(TRACEINDEX index, TRACEINDEX* base)
     const auto cache = pages.find(Range(index, index));
     if(cache != pages.cend())
     {
-        if(cache->first.first >= index && cache->first.second <= index)
+        if(cache->first.first <= index && cache->first.second >= index)
         {
-            if(lastAccessedPage)
-                GetSystemTimes(nullptr, nullptr, &lastAccessedPage->lastAccessed);
             lastAccessedPage = &cache->second;
             lastAccessedIndexOffset = cache->first.first;
-            GetSystemTimes(nullptr, nullptr, &lastAccessedPage->lastAccessed);
+            touchPageLru(lastAccessedIndexOffset);
             *base = lastAccessedIndexOffset;
             return lastAccessedPage;
         }
@@ -318,24 +358,12 @@ TraceFilePage* TraceFileReader::getPage(TRACEINDEX index, TRACEINDEX* base)
     size_t maxPages = getMaxCachedPages();
     while(pages.size() >= maxPages)
     {
-        FILETIME pageOutTime = pages.begin()->second.lastAccessed;
-        Range pageOutIndex = pages.begin()->first;
-        for(auto & i : pages)
+        if(pageLruList.empty())
         {
-            if(pageOutTime.dwHighDateTime < i.second.lastAccessed.dwHighDateTime || (pageOutTime.dwHighDateTime == i.second.lastAccessed.dwHighDateTime && pageOutTime.dwLowDateTime < i.second.lastAccessed.dwLowDateTime))
-            {
-                pageOutTime = i.second.lastAccessed;
-                pageOutIndex = i.first;
-            }
+            clearPageCache();
+            break;
         }
-        if(lastAccessedPage)
-        {
-            if(pageOutIndex.first == lastAccessedIndexOffset)
-            {
-                lastAccessedPage = nullptr; // going to delete this page
-            }
-        }
-        pages.erase(pageOutIndex);
+        erasePage(pageLruList.back());
     }
     //binary search fileIndex to get file offset, push a TraceFilePage into cache and return it.
     size_t start = 0;
@@ -370,11 +398,11 @@ TraceFilePage* TraceFileReader::getPage(TRACEINDEX index, TRACEINDEX* base)
         const auto newPage = pages.find(Range(index, index));
         if(newPage != pages.cend())
         {
-            if(lastAccessedPage)
-                GetSystemTimes(nullptr, nullptr, &lastAccessedPage->lastAccessed);
+            pageLruList.push_front(newPage->first);
+            pageLruMap[newPage->first.first] = pageLruList.begin();
             lastAccessedPage = &newPage->second;
             lastAccessedIndexOffset = newPage->first.first;
-            GetSystemTimes(nullptr, nullptr, &lastAccessedPage->lastAccessed);
+            touchPageLru(lastAccessedIndexOffset);
             *base = lastAccessedIndexOffset;
             return lastAccessedPage;
         }
@@ -593,11 +621,8 @@ void TraceFileReader::purgeLastPage()
         const auto lastpage = pages.find(Range(index, index));
         if(lastpage != pages.cend())
         {
-            //Purge last accessed page
-            if(index == lastAccessedIndexOffset)
-                lastAccessedPage = nullptr;
             //Remove last page from page cache
-            pages.erase(lastpage);
+            erasePage(lastpage->first);
         }
         //Seek start of last page
         traceFile.seek(fileIndex.back().second.first);
@@ -796,7 +821,6 @@ TraceFilePage::TraceFilePage(TraceFileReader* parent, unsigned long long fileOff
     uint32_t memOperandOffset = 0;
     mParent = parent;
     length = 0;
-    GetSystemTimes(nullptr, nullptr, &lastAccessed); //system user time, no GetTickCount64() for XP compatibility.
     memset(&registers, 0, sizeof(registers));
     try
     {
