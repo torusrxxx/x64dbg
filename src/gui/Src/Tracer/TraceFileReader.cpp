@@ -93,6 +93,15 @@ bool TraceFileReader::Delete()
     return value;
 }
 
+void TraceFileReader::insertPageLru(const Range & range)
+{
+    const auto lruEntry = pageLruMap.find(range.first);
+    if(lruEntry != pageLruMap.cend())
+        pageLruList.erase(lruEntry->second);
+    pageLruList.push_front(range);
+    pageLruMap[range.first] = pageLruList.begin();
+}
+
 void TraceFileReader::touchPageLru(TRACEINDEX pageStart)
 {
     const auto lruEntry = pageLruMap.find(pageStart);
@@ -101,7 +110,6 @@ void TraceFileReader::touchPageLru(TRACEINDEX pageStart)
 
     if(lruEntry->second != pageLruList.begin())
         pageLruList.splice(pageLruList.begin(), pageLruList, lruEntry->second);
-    lruEntry->second = pageLruList.begin();
 }
 
 void TraceFileReader::erasePage(Range range)
@@ -360,6 +368,8 @@ TraceFilePage* TraceFileReader::getPage(TRACEINDEX index, TRACEINDEX* base)
     {
         if(pageLruList.empty())
         {
+            // Defensive recovery if the LRU metadata gets out of sync with the page map.
+            GuiAddLogMessage("[TraceFileReader::getPage] Recovering from inconsistent page cache metadata\r\n");
             clearPageCache();
             break;
         }
@@ -398,11 +408,9 @@ TraceFilePage* TraceFileReader::getPage(TRACEINDEX index, TRACEINDEX* base)
         const auto newPage = pages.find(Range(index, index));
         if(newPage != pages.cend())
         {
-            pageLruList.push_front(newPage->first);
-            pageLruMap[newPage->first.first] = pageLruList.begin();
+            insertPageLru(newPage->first);
             lastAccessedPage = &newPage->second;
             lastAccessedIndexOffset = newPage->first.first;
-            touchPageLru(lastAccessedIndexOffset);
             *base = lastAccessedIndexOffset;
             return lastAccessedPage;
         }
