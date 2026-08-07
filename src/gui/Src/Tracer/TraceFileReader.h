@@ -1,10 +1,9 @@
 #pragma once
 
 #include "Bridge.h"
+#include <QCache>
 #include <QFile>
 #include <atomic>
-#include <list>
-#include <unordered_map>
 #include "TraceFileDump.h"
 #include "zydis_wrapper.h"
 
@@ -66,13 +65,6 @@ private slots:
 
 private:
     typedef std::pair<TRACEINDEX, TRACEINDEX> Range;
-    struct RangeCompare //from addrinfo.h
-    {
-        bool operator()(const Range & a, const Range & b) const //a before b?
-        {
-            return a.second < b.first;
-        }
-    };
 
     QFile traceFile;
     qint64 fileSize = 0;
@@ -83,19 +75,12 @@ private:
     std::atomic<int> progress;
     bool error = true;
     QString errorMessage;
-    TraceFilePage* lastAccessedPage = nullptr;
-    TRACEINDEX lastAccessedIndexOffset = 0;
     friend class TraceFileParser;
     friend class TraceFilePage;
 
     TraceFileParser* parser = nullptr;
-    std::map<Range, TraceFilePage, RangeCompare> pages;
-    std::list<Range> pageLruList;
-    std::unordered_map<TRACEINDEX, std::list<Range>::iterator> pageLruMap;
+    QCache<TRACEINDEX, TraceFilePage> pageCache;
     TraceFilePage* getPage(TRACEINDEX index, TRACEINDEX* base);
-    void insertPageLru(const Range & range);
-    void touchPageLru(TRACEINDEX pageStart);
-    void erasePage(Range range);
     void clearPageCache();
     TraceFileDump dump;
     void buildDump(TRACEINDEX index);

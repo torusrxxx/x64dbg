@@ -11,6 +11,7 @@ TraceFileReader::TraceFileReader(QObject* parent) : QObject(parent)
 {
     progress = 0;
     EXEPath.clear();
+    pageCache.setMaxCost((int)getMaxCachedPages());
 
     int maxModuleSize = (int)ConfigUint("Disassembler", "MaxModuleSize");
     // TODO: refactor this to come from the parent TraceWidget
@@ -93,50 +94,9 @@ bool TraceFileReader::Delete()
     return value;
 }
 
-void TraceFileReader::insertPageLru(const Range & range)
-{
-    const auto lruEntry = pageLruMap.find(range.first);
-    if(lruEntry != pageLruMap.cend())
-        pageLruList.erase(lruEntry->second);
-    pageLruList.push_front(range);
-    pageLruMap[range.first] = pageLruList.begin();
-}
-
-void TraceFileReader::touchPageLru(TRACEINDEX pageStart)
-{
-    const auto lruEntry = pageLruMap.find(pageStart);
-    if(lruEntry == pageLruMap.cend())
-        return;
-
-    if(lruEntry->second != pageLruList.begin())
-        pageLruList.splice(pageLruList.begin(), pageLruList, lruEntry->second);
-}
-
-void TraceFileReader::erasePage(Range range)
-{
-    const auto lruEntry = pageLruMap.find(range.first);
-    if(lruEntry != pageLruMap.cend())
-    {
-        pageLruList.erase(lruEntry->second);
-        pageLruMap.erase(lruEntry);
-    }
-
-    if(lastAccessedPage && range.first == lastAccessedIndexOffset)
-    {
-        lastAccessedPage = nullptr;
-        lastAccessedIndexOffset = 0;
-    }
-
-    pages.erase(range);
-}
-
 void TraceFileReader::clearPageCache()
 {
-    pages.clear();
-    pageLruList.clear();
-    pageLruMap.clear();
-    lastAccessedPage = nullptr;
-    lastAccessedIndexOffset = 0;
+    pageCache.clear();
 }
 
 void TraceFileReader::parseFinishedSlot()
@@ -337,45 +297,9 @@ static size_t getMaxCachedPages()
 // Used internally to get the page for the given index and read from disk if necessary
 TraceFilePage* TraceFileReader::getPage(TRACEINDEX index, TRACEINDEX* base)
 {
-    // Try to access the most recently used page
-    if(lastAccessedPage)
-    {
-        if(index >= lastAccessedIndexOffset && index < lastAccessedIndexOffset + lastAccessedPage->Length())
-        {
-            touchPageLru(lastAccessedIndexOffset);
-            *base = lastAccessedIndexOffset;
-            return lastAccessedPage;
-        }
-    }
-    // Try to access pages in memory
-    const auto cache = pages.find(Range(index, index));
-    if(cache != pages.cend())
-    {
-        if(cache->first.first <= index && cache->first.second >= index)
-        {
-            lastAccessedPage = &cache->second;
-            lastAccessedIndexOffset = cache->first.first;
-            touchPageLru(lastAccessedIndexOffset);
-            *base = lastAccessedIndexOffset;
-            return lastAccessedPage;
-        }
-    }
-    else if(index >= Length()) //Out of bound
+    if(index >= Length()) //Out of bound
         return nullptr;
-    // Remove an oldest page from system memory to make room for a new one.
-    size_t maxPages = getMaxCachedPages();
-    while(pages.size() >= maxPages)
-    {
-        if(pageLruList.empty())
-        {
-            // Defensive recovery if the LRU metadata gets out of sync with the page map.
-            GuiAddLogMessage("[TraceFileReader::getPage] Recovering from inconsistent page cache metadata\r\n");
-            clearPageCache();
-            break;
-        }
-        erasePage(pageLruList.back());
-    }
-    //binary search fileIndex to get file offset, push a TraceFilePage into cache and return it.
+    //binary search fileIndex to get file offset
     size_t start = 0;
     size_t end = fileIndex.size() - 1;
     size_t middle = (start + end) / 2;
@@ -401,18 +325,23 @@ TraceFilePage* TraceFileReader::getPage(TRACEINDEX index, TRACEINDEX* base)
             start = middle;
         middle = (start + end) / 2;
     }
-    // Read the requested page from disk and return
+    TRACEINDEX pageStart = fileOffset->first;
+    // Try to find in cache
+    TraceFilePage* page = pageCache.object(pageStart);
+    if(page)
+    {
+        *base = pageStart;
+        return page;
+    }
+    // Read the requested page from disk and insert into cache
     if(fileOffset->second.second + fileOffset->first >= index && fileOffset->first <= index)
     {
-        pages.insert(std::make_pair(Range(fileOffset->first, fileOffset->first + fileOffset->second.second - 1), TraceFilePage(this, fileOffset->second.first, fileOffset->second.second)));
-        const auto newPage = pages.find(Range(index, index));
-        if(newPage != pages.cend())
+        pageCache.insert(pageStart, new TraceFilePage(this, fileOffset->second.first, fileOffset->second.second));
+        page = pageCache.object(pageStart);
+        if(page)
         {
-            insertPageLru(newPage->first);
-            lastAccessedPage = &newPage->second;
-            lastAccessedIndexOffset = newPage->first.first;
-            *base = lastAccessedIndexOffset;
-            return lastAccessedPage;
+            *base = pageStart;
+            return page;
         }
         else
         {
@@ -431,8 +360,7 @@ TraceFilePage* TraceFileReader::getPage(TRACEINDEX index, TRACEINDEX* base)
 void TraceFileReader::tokenizerUpdatedSlot()
 {
     mDisasm->UpdateConfig();
-    for(auto & i : pages)
-        i.second.updateInstructions();
+    pageCache.clear();
 }
 
 //Parser
@@ -626,12 +554,8 @@ void TraceFileReader::purgeLastPage()
     if(length > 0)
     {
         index = fileIndex.back().first;
-        const auto lastpage = pages.find(Range(index, index));
-        if(lastpage != pages.cend())
-        {
-            //Remove last page from page cache
-            erasePage(lastpage->first);
-        }
+        //Remove last page from page cache
+        pageCache.remove(index);
         //Seek start of last page
         traceFile.seek(fileIndex.back().second.first);
         //Remove last page from file index cache
